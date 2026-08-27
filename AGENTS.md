@@ -3,7 +3,11 @@
 Go 1.26+ proxy server providing OpenAI/Gemini/Claude/Codex compatible APIs with OAuth and round-robin load balancing.
 
 ## Repository
-- GitHub: https://github.com/router-for-me/CLIProxyAPI
+- Managed fork: https://github.com/z0rgoyok/CLIProxyAPI.v8
+- Upstream: https://github.com/router-for-me/CLIProxyAPI
+- Deploy OS project: `cli-proxy-api-v8` (see `.ops-project`)
+- Production artifacts are built from this managed fork. Runtime configuration
+  and OAuth credentials belong to Deploy OS and must not enter this repository.
 
 ## Commands
 ```bash

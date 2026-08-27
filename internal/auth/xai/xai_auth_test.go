@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -213,6 +215,26 @@ func TestBuildTokenDataOmitsExpireWhenExpiresInZero(t *testing.T) {
 	tokenData = buildTokenData("access", "refresh", "", "Bearer", 60, "user@x.ai", "sub-1")
 	if tokenData.Expire == "" {
 		t.Fatal("Expire empty, want RFC3339 timestamp")
+	}
+}
+
+func TestSaveTokenToFileRestrictsPermissions(t *testing.T) {
+	authFile := filepath.Join(t.TempDir(), "xai-user.json")
+	if err := os.WriteFile(authFile, []byte("stale\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	storage := &TokenStorage{AccessToken: "access", RefreshToken: "refresh"}
+	if err := storage.SaveTokenToFile(authFile); err != nil {
+		t.Fatalf("SaveTokenToFile() error = %v", err)
+	}
+
+	info, err := os.Stat(authFile)
+	if err != nil {
+		t.Fatalf("Stat() error = %v", err)
+	}
+	if got := info.Mode().Perm(); got != 0o600 {
+		t.Fatalf("auth file permissions = %o, want 600", got)
 	}
 }
 
