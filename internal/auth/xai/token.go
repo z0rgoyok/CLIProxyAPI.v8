@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/misc"
-	log "github.com/sirupsen/logrus"
 )
 
 // TokenStorage stores xAI OAuth credentials on disk.
@@ -51,23 +50,32 @@ func (ts *TokenStorage) SaveTokenToFile(authFilePath string) error {
 		return fmt.Errorf("xai token storage: merge metadata: %w", errMerge)
 	}
 
-	file, err := os.OpenFile(authFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	file, err := os.CreateTemp(filepath.Dir(authFilePath), ".xai-token-*.tmp")
 	if err != nil {
-		return fmt.Errorf("xai token storage: create token file: %w", err)
+		return fmt.Errorf("xai token storage: create temporary token file: %w", err)
 	}
+	tempPath := file.Name()
 	defer func() {
-		if errClose := file.Close(); errClose != nil {
-			log.Errorf("xai token storage: close token file error: %v", errClose)
-		}
+		_ = file.Close()
+		_ = os.Remove(tempPath)
 	}()
 	if errChmod := file.Chmod(0o600); errChmod != nil {
-		return fmt.Errorf("xai token storage: restrict token file permissions: %w", errChmod)
+		return fmt.Errorf("xai token storage: restrict temporary token file permissions: %w", errChmod)
 	}
 
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "  ")
 	if err = encoder.Encode(data); err != nil {
 		return fmt.Errorf("xai token storage: write token file: %w", err)
+	}
+	if errSync := file.Sync(); errSync != nil {
+		return fmt.Errorf("xai token storage: sync temporary token file: %w", errSync)
+	}
+	if errClose := file.Close(); errClose != nil {
+		return fmt.Errorf("xai token storage: close temporary token file: %w", errClose)
+	}
+	if errRename := os.Rename(tempPath, authFilePath); errRename != nil {
+		return fmt.Errorf("xai token storage: replace token file: %w", errRename)
 	}
 	return nil
 }

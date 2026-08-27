@@ -223,6 +223,16 @@ func TestSaveTokenToFileRestrictsPermissions(t *testing.T) {
 	if err := os.WriteFile(authFile, []byte("stale\n"), 0o644); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
+	if err := os.Chmod(authFile, 0o644); err != nil {
+		t.Fatalf("Chmod() error = %v", err)
+	}
+	before, err := os.Stat(authFile)
+	if err != nil {
+		t.Fatalf("Stat() before save error = %v", err)
+	}
+	if got := before.Mode().Perm(); got != 0o644 {
+		t.Fatalf("auth file precondition permissions = %o, want 644", got)
+	}
 
 	storage := &TokenStorage{AccessToken: "access", RefreshToken: "refresh"}
 	if err := storage.SaveTokenToFile(authFile); err != nil {
