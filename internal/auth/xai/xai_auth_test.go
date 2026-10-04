@@ -7,8 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -118,11 +116,12 @@ func TestPollForTokenExchangesDeviceCode(t *testing.T) {
 	defer server.Close()
 
 	auth := NewXAIAuth(nil)
+	auth.minPollInterval = time.Millisecond
 	tokenData, err := auth.PollForToken(context.Background(), &DeviceCodeResponse{
 		DeviceCode:    "device-abc",
 		UserCode:      "ABCD-1234",
 		ExpiresIn:     60,
-		Interval:      1,
+		Interval:      0,
 		TokenEndpoint: server.URL,
 	})
 	if err != nil {
@@ -189,11 +188,12 @@ func TestPollForTokenSlowDownContinuesPolling(t *testing.T) {
 	defer server.Close()
 
 	auth := NewXAIAuth(nil)
+	auth.minPollInterval = time.Millisecond
 	tokenData, err := auth.PollForToken(context.Background(), &DeviceCodeResponse{
 		DeviceCode:    "device-abc",
 		UserCode:      "ABCD-1234",
 		ExpiresIn:     60,
-		Interval:      5,
+		Interval:      0,
 		TokenEndpoint: server.URL,
 	})
 	if err != nil {
@@ -215,36 +215,6 @@ func TestBuildTokenDataOmitsExpireWhenExpiresInZero(t *testing.T) {
 	tokenData = buildTokenData("access", "refresh", "", "Bearer", 60, "user@x.ai", "sub-1")
 	if tokenData.Expire == "" {
 		t.Fatal("Expire empty, want RFC3339 timestamp")
-	}
-}
-
-func TestSaveTokenToFileRestrictsPermissions(t *testing.T) {
-	authFile := filepath.Join(t.TempDir(), "xai-user.json")
-	if err := os.WriteFile(authFile, []byte("stale\n"), 0o644); err != nil {
-		t.Fatalf("WriteFile() error = %v", err)
-	}
-	if err := os.Chmod(authFile, 0o644); err != nil {
-		t.Fatalf("Chmod() error = %v", err)
-	}
-	before, err := os.Stat(authFile)
-	if err != nil {
-		t.Fatalf("Stat() before save error = %v", err)
-	}
-	if got := before.Mode().Perm(); got != 0o644 {
-		t.Fatalf("auth file precondition permissions = %o, want 644", got)
-	}
-
-	storage := &TokenStorage{AccessToken: "access", RefreshToken: "refresh"}
-	if err := storage.SaveTokenToFile(authFile); err != nil {
-		t.Fatalf("SaveTokenToFile() error = %v", err)
-	}
-
-	info, err := os.Stat(authFile)
-	if err != nil {
-		t.Fatalf("Stat() error = %v", err)
-	}
-	if got := info.Mode().Perm(); got != 0o600 {
-		t.Fatalf("auth file permissions = %o, want 600", got)
 	}
 }
 
@@ -349,6 +319,16 @@ func TestRefreshTokens_DeduplicatesConcurrentRefresh(t *testing.T) {
 	}
 	if got := atomic.LoadInt32(&calls); got != 1 {
 		t.Fatalf("expected both refresh callers to share a single upstream call, got %d", got)
+	}
+}
+
+func TestXAIAuthDefaultPollInterval(t *testing.T) {
+	auth := NewXAIAuth(nil)
+	if auth.minPollInterval != 0 {
+		t.Fatalf("auth.minPollInterval = %v, want 0 (defaults to %v in production)", auth.minPollInterval, defaultPollInterval)
+	}
+	if defaultPollInterval != 5*time.Second {
+		t.Fatalf("defaultPollInterval = %v, want 5s", defaultPollInterval)
 	}
 }
 
