@@ -64,17 +64,17 @@ func GetCodexFreeModels() []*ModelInfo {
 
 // GetCodexTeamModels returns model definitions for the Codex team plan tier.
 func GetCodexTeamModels() []*ModelInfo {
-	return WithCodexBuiltins(cloneModelInfos(getModels().CodexTeam))
+	return WithCodexBuiltins(withCodexTerra(cloneModelInfos(getModels().CodexTeam)))
 }
 
 // GetCodexPlusModels returns model definitions for the Codex plus plan tier.
 func GetCodexPlusModels() []*ModelInfo {
-	return WithCodexBuiltins(cloneModelInfos(getModels().CodexPlus))
+	return WithCodexBuiltins(withCodexTerra(cloneModelInfos(getModels().CodexPlus)))
 }
 
 // GetCodexProModels returns model definitions for the Codex pro plan tier.
 func GetCodexProModels() []*ModelInfo {
-	return WithCodexBuiltins(cloneModelInfos(getModels().CodexPro))
+	return WithCodexBuiltins(withCodexTerra(cloneModelInfos(getModels().CodexPro)))
 }
 
 // GetKimiModels returns the standard Kimi (Moonshot AI) model definitions.
@@ -240,6 +240,24 @@ func AntigravityWebSearchModelFor(modelID string) string {
 // GetXAIModels returns the standard xAI Grok model definitions.
 func GetXAIModels() []*ModelInfo {
 	return WithXAIBuiltins(cloneModelInfos(getModels().XAI))
+}
+
+// withCodexTerra preserves a missing paid-tier model until the upstream registry
+// publishes it. An upstream definition takes precedence when it becomes available.
+func withCodexTerra(models []*ModelInfo) []*ModelInfo {
+	for _, model := range models {
+		if model != nil && strings.EqualFold(model.ID, "gpt-6.1-terra") {
+			return models
+		}
+	}
+	return append(models, &ModelInfo{
+		ID: "gpt-6.1-terra", Object: "model", OwnedBy: "openai", Type: "openai",
+		DisplayName: "GPT 6.1 Terra", Version: "gpt-6.1-terra", ContextLength: 500000,
+		SupportedInputModalities:   []string{"text", "image"},
+		SupportedOutputModalities:  []string{"text"},
+		Thinking:                   &ThinkingSupport{Levels: []string{"low", "medium", "high", "xhigh", "max"}},
+		SupportConfigurationUpdate: true,
+	})
 }
 
 // WithCodexBuiltins injects hard-coded Codex-only model definitions that should
